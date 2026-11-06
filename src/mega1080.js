@@ -3,8 +3,10 @@ const API=`${BASE_URL}/api/rest`;
 const HEADERS={'User-Agent':'Mozilla/5.0 (Kino Mega1080 Plugin)','Accept':'application/json','Referer':BASE_URL+'/'};
 async function get(path){if(typeof kino==='undefined'||!kino.fetch)throw Error('Kino fetch no disponible');const r=await kino.fetch(API+path,{headers:HEADERS});if(!r.ok)throw Error(`Mega1080 HTTP ${r.status}`);const j=await r.json();if(j.error)throw Error(j.message||'Respuesta inválida de Mega1080');return j.data}
 function abs(v){return v?(/^https?:/.test(v)?v:BASE_URL+v):''}
+function tmdbImage(path,size='w500'){const p=String(path||'').trim();return /^\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i.test(p)?`https://image.tmdb.org/t/p/${size}${p}`:''}
+function galleryImage(x,size='w500'){return tmdbImage(String(x.gallery||'').split(/\s+/).find(Boolean)||'',size)}
 function kindOf(type){return type==='tvshows'?'series':type==='animes'?'anime':'movie'}
-export function card(x,type='movies'){return {id:String(x._id),ref:`${BASE_URL}/${type==='tvshows'?'series':type==='animes'?'animes':'peliculas'}/${x.slug}/`,title:x.title,overview:x.overview||'',kind:kindOf(type),type:kindOf(type),poster:abs(x.images?.poster),art:abs(x.images?.backdrop||x.images?.poster),backdrop:abs(x.images?.backdrop),year:x.year||Number((x.title||'').match(/\((\d{4})\)/)?.[1])}}
+export function card(x,type='movies'){return {id:String(x._id),ref:`${BASE_URL}/${type==='tvshows'?'series':type==='animes'?'animes':'peliculas'}/${x.slug}/`,title:x.title,overview:x.overview||'',kind:kindOf(type),type:kindOf(type),poster:galleryImage(x,'w500')||abs(x.images?.poster),art:galleryImage(x,'original')||abs(x.images?.backdrop||x.images?.poster),backdrop:galleryImage(x,'original')||abs(x.images?.backdrop),year:x.year||Number((x.title||'').match(/\((\d{4})\)/)?.[1])}}
 export async function sliders(type){return (await get(`/sliders?type=${type}`)).map(x=>card(x,type))}
 export async function listing(type='movies',page=1){const d=await get(`/listing?post_type=${type}&page=${page}&genres=&years=&order=latest`);return {items:(d.posts||[]).map(x=>card(x,type)),next:d.next_page?String(page+1):undefined}}
 export async function searchMega(q,type='movies'){const d=await get(`/search?post_type=${type}&query=${encodeURIComponent(q)}`);return (d.posts||[]).map(x=>card(x,type))}

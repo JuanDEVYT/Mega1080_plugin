@@ -1,6 +1,6 @@
 import {makeBrowse} from './browse/index.js';
 import {sliders,listing,searchMega,detail,players,episodeList,resolveEmbed} from './mega1080.js';
-const VERSION='1.0.0',P=`[Mega1080 v${VERSION}]`;console.log(`${P} Creado por JuandreXter`);const log=x=>console.log(P,x);
+const VERSION='1.0.1',P=`[Mega1080 v${VERSION}]`;console.log(`${P} Creado por JuandreXter`);const log=x=>console.log(P,x);
 let b;function app(){return b||(b=makeBrowse({kino:typeof kino!=='undefined'?kino:null,loadTab,searchTitles:async q=>(await search({q})).items}))}
 async function loadTab(t){log(`loadTab("${t}")`);if(t==='inicio')return{rows:await home()};const r=await browse(t,'1');return{rows:[{id:t,title:t==='peliculas'?'Películas':'Series',ref:t,items:r.items}]}}
 export async function home(){log('home(): cargando rieles');const [m,s,a]=await Promise.all([sliders('movies'),sliders('tvshows'),sliders('animes')]);return[{id:'movies',title:'Películas destacadas',ref:'peliculas',items:m},{id:'series',title:'Series destacadas',ref:'series',items:s},{id:'anime',title:'Anime destacado',ref:'animes',items:a}].filter(x=>x.items.length)}
