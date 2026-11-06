@@ -1,20 +1,141 @@
-export const BASE_URL='https://mega1080.me';
-const API=`${BASE_URL}/api/rest`;
-const HEADERS={'User-Agent':'Mozilla/5.0 (Kino Mega1080 Plugin)','Accept':'application/json','Referer':BASE_URL+'/'};
-async function get(path){if(typeof kino==='undefined'||!kino.fetch)throw Error('Kino fetch no disponible');const r=await kino.fetch(API+path,{headers:HEADERS});if(!r.ok)throw Error(`Mega1080 HTTP ${r.status}`);const j=await r.json();if(j.error)throw Error(j.message||'Respuesta inválida de Mega1080');return j.data}
-function abs(v){return v?(/^https?:/.test(v)?v:BASE_URL+v):''}
-function tmdbImage(path,size='w500'){const p=String(path||'').trim();return /^\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i.test(p)?`https://image.tmdb.org/t/p/${size}${p}`:''}
-function galleryImage(x,size='w500'){return tmdbImage(String(x.gallery||'').split(/\s+/).find(Boolean)||'',size)}
-function kindOf(type){return type==='tvshows'?'series':type==='animes'?'anime':'movie'}
-export function card(x,type='movies'){return {id:String(x._id),ref:`${BASE_URL}/${type==='tvshows'?'series':type==='animes'?'animes':'peliculas'}/${x.slug}/`,title:x.title,overview:x.overview||'',kind:kindOf(type),type:kindOf(type),poster:galleryImage(x,'w500')||abs(x.images?.poster),art:galleryImage(x,'original')||abs(x.images?.backdrop||x.images?.poster),backdrop:galleryImage(x,'original')||abs(x.images?.backdrop),year:x.year||Number((x.title||'').match(/\((\d{4})\)/)?.[1])}}
-export async function sliders(type){return (await get(`/sliders?type=${type}`)).map(x=>card(x,type))}
-export async function listing(type='movies',page=1){const d=await get(`/listing?post_type=${type}&page=${page}&genres=&years=&order=latest`);return {items:(d.posts||[]).map(x=>card(x,type)),next:d.next_page?String(page+1):undefined}}
-export async function searchMega(q,type='movies'){const d=await get(`/search?post_type=${type}&query=${encodeURIComponent(q)}`);return (d.posts||[]).map(x=>card(x,type))}
-export async function detail(ref){const u=new URL(ref);const bits=u.pathname.split('/').filter(Boolean);const type=bits[0]==='series'?'tvshows':bits[0]==='animes'?'animes':'movies';const slug=bits.at(-1);const d=await get(`/single?post_name=${encodeURIComponent(slug)}&post_type=${type}`);const x=d.post||d;const out=card(x,type);out.ref=ref;out.sourceId=String(x._id);out.ids=x.ids||x.external_ids||{};out.genres=x.genres||[];out.rating=x.vote_average||x.rating;return out}
-export async function resolveMega(ref){const d=await detail(ref);throw Error(`Mega1080 no expuso un stream HLS directo para “${d.title}”.`)}
-export async function players(id){return get(`/player?post_id=${encodeURIComponent(id)}`)}
-export async function episodeList(id){return get(`/episodes?post_id=${encodeURIComponent(id)}`)}
-export async function resolveEmbed(url){const r=await kino.fetch(url,{headers:{'User-Agent':HEADERS['User-Agent'],'Referer':BASE_URL+'/'}});const html=await r.text();const source=unpackPacker(html);const m=source.match(/https?:[^"'\\\s]+\.m3u8[^"'\\\s]*/i)||source.match(/["'](\/[^"']+\.m3u8[^"']*)/i);if(!m)throw Error('El embed no expuso un manifiesto HLS');const stream=(m[1]||m[0]).replace(/\\u0026/g,'&');return {url:stream.startsWith('/')?new URL(stream,url).href:stream,mime:'application/x-mpegURL',headers:{Referer:url,'User-Agent':HEADERS['User-Agent']}}}
-function unescapeJs(s){return s.replace(/\\x([0-9a-f]{2})/gi,(_,h)=>String.fromCharCode(parseInt(h,16))).replace(/\\'/g,"'").replace(/\\\\/g,'\\')}
-function token(n,radix){const chars='0123456789abcdefghijklmnopqrstuvwxyz';let s='';do{s=chars[n%radix]+s;n=Math.floor(n/radix)}while(n);return s}
-export function unpackPacker(html){const m=html.match(/eval\(function\(p,a,c,k,e,[\s\S]*?\}\('((?:\\.|[^'])*)',(\d+),(\d+),'((?:\\.|[^'])*)'\.split\('\|'\)\)\)/);if(!m)return html;const payload=unescapeJs(m[1]),radix=Number(m[2]),count=Number(m[3]),dict=unescapeJs(m[4]).split('|');let out=payload;for(let i=count-1;i>=0;i--){const word=dict[i];if(word)out=out.replace(new RegExp('\\b'+token(i,radix)+'\\b','g'),word)}return out}
+export const BASE_URL = 'https://mega1080.me';
+const API = `${BASE_URL}/api/rest`;
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'application/json',
+  'Referer': BASE_URL + '/',
+};
+
+async function get(path) {
+  if (typeof kino === 'undefined' || !kino.fetch) throw Error('Kino fetch no disponible');
+  const r = await kino.fetch(API + path, { headers: HEADERS });
+  if (!r.ok) throw Error(`Mega1080 HTTP ${r.status}`);
+  const j = await r.json();
+  if (j.error) throw Error(j.message || 'Respuesta inválida de Mega1080');
+  return j.data;
+}
+
+function abs(v) {
+  return v ? (/^https?:/.test(v) ? v : BASE_URL + v) : '';
+}
+
+function tmdbImage(path, size = 'w500') {
+  const p = String(path || '').trim();
+  return /^\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i.test(p) ? `https://image.tmdb.org/t/p/${size}${p}` : '';
+}
+
+function galleryImage(x, size = 'w500') {
+  return tmdbImage(String(x.gallery || '').split(/\s+/).find(Boolean) || '', size);
+}
+
+function kindOf(type) {
+  return type === 'tvshows' ? 'series' : type === 'animes' ? 'anime' : 'movie';
+}
+
+export function card(x, type = 'movies') {
+  return {
+    id: String(x._id),
+    ref: `${BASE_URL}/${type === 'tvshows' ? 'series' : type === 'animes' ? 'animes' : 'peliculas'}/${x.slug}/`,
+    title: x.title,
+    overview: x.overview || '',
+    kind: kindOf(type),
+    type: kindOf(type),
+    poster: galleryImage(x, 'w500') || abs(x.images?.poster),
+    art: galleryImage(x, 'original') || abs(x.images?.backdrop || x.images?.poster),
+    backdrop: galleryImage(x, 'original') || abs(x.images?.backdrop),
+    year: x.year || Number((x.title || '').match(/\((\d{4})\)/)?.[1]),
+  };
+}
+
+export async function sliders(type) {
+  return (await get(`/sliders?type=${type}`)).map(x => card(x, type));
+}
+
+export async function listing(type = 'movies', page = 1) {
+  const d = await get(`/listing?post_type=${type}&page=${page}&genres=&years=&order=latest`);
+  return {
+    items: (d.posts || []).map(x => card(x, type)),
+    next: d.next_page ? String(page + 1) : undefined,
+  };
+}
+
+export async function searchMega(q, type = 'movies') {
+  const d = await get(`/search?post_type=${type}&query=${encodeURIComponent(q)}`);
+  return (d.posts || []).map(x => card(x, type));
+}
+
+export async function detail(ref) {
+  const u = new URL(ref);
+  const bits = u.pathname.split('/').filter(Boolean);
+  const type = bits[0] === 'series' ? 'tvshows' : bits[0] === 'animes' ? 'animes' : 'movies';
+  const slug = bits.at(-1);
+  const d = await get(`/single?post_name=${encodeURIComponent(slug)}&post_type=${type}`);
+  const x = d.post || d;
+  const out = card(x, type);
+  out.ref = ref;
+  out.sourceId = String(x._id);
+  out.ids = x.ids || x.external_ids || {};
+  out.genres = x.genres || [];
+  out.rating = x.vote_average || x.rating;
+  return out;
+}
+
+export async function players(id) {
+  return get(`/player?post_id=${encodeURIComponent(id)}`);
+}
+
+export async function episodeList(id) {
+  return get(`/episodes?post_id=${encodeURIComponent(id)}`);
+}
+
+function unescapeJs(s) {
+  return s
+    .replace(/\\x([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, '\\');
+}
+
+function token(n, radix) {
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  let s = '';
+  do {
+    s = chars[n % radix] + s;
+    n = Math.floor(n % radix);
+  } while (n);
+  return s;
+}
+
+export function unpackPacker(html) {
+  const m = html.match(/eval\(function\(p,a,c,k,e,[\s\S]*?\}\('((?:\\.|[^'])*)',(\d+),(\d+),'((?:\\.|[^'])*)'\.split\('\|'\)\)\)/);
+  if (!m) return html;
+  const payload = unescapeJs(m[1]), radix = Number(m[2]), count = Number(m[3]), dict = unescapeJs(m[4]).split('|');
+  let out = payload;
+  for (let i = count - 1; i >= 0; i--) {
+    const word = dict[i];
+    if (word) out = out.replace(new RegExp('\\b' + token(i, radix) + '\\b', 'g'), word);
+  }
+  return out;
+}
+
+export async function resolveEmbed(url) {
+  const r = await kino.fetch(url, {
+    headers: {
+      'User-Agent': HEADERS['User-Agent'],
+      'Referer': BASE_URL + '/',
+    },
+  });
+  if (!r.ok) throw Error(`HTTP ${r.status}`);
+  const html = await r.text();
+  const source = unpackPacker(html);
+  const m = source.match(/https?:[^"'\\\s]+\.m3u8[^"'\\\s]*/i) || source.match(/["'](\/[^"']+\.m3u8[^"']*)/i);
+  if (!m) throw Error('El embed no expuso un manifiesto HLS');
+  const stream = (m[1] || m[0]).replace(/\\u0026/g, '&');
+  return {
+    url: stream.startsWith('/') ? new URL(stream, url).href : stream,
+    mime: 'application/x-mpegURL',
+    headers: {
+      Referer: url,
+      'User-Agent': HEADERS['User-Agent'],
+    },
+  };
+}

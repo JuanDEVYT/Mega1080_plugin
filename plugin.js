@@ -927,7 +927,11 @@ function makeBrowse({ kino: kino2, loadTab: loadTab2, searchTitles }) {
 // src/mega1080.js
 var BASE_URL = "https://mega1080.me";
 var API = `${BASE_URL}/api/rest`;
-var HEADERS = { "User-Agent": "Mozilla/5.0 (Kino Mega1080 Plugin)", "Accept": "application/json", "Referer": BASE_URL + "/" };
+var HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json",
+  "Referer": BASE_URL + "/"
+};
 async function get(path) {
   if (typeof kino === "undefined" || !kino.fetch) throw Error("Kino fetch no disponible");
   const r = await kino.fetch(API + path, { headers: HEADERS });
@@ -950,14 +954,28 @@ function kindOf(type) {
   return type === "tvshows" ? "series" : type === "animes" ? "anime" : "movie";
 }
 function card(x, type = "movies") {
-  return { id: String(x._id), ref: `${BASE_URL}/${type === "tvshows" ? "series" : type === "animes" ? "animes" : "peliculas"}/${x.slug}/`, title: x.title, overview: x.overview || "", kind: kindOf(type), type: kindOf(type), poster: galleryImage(x, "w500") || abs(x.images?.poster), art: galleryImage(x, "original") || abs(x.images?.backdrop || x.images?.poster), backdrop: galleryImage(x, "original") || abs(x.images?.backdrop), year: x.year || Number((x.title || "").match(/\((\d{4})\)/)?.[1]) };
+  return {
+    id: String(x._id),
+    ref: `${BASE_URL}/${type === "tvshows" ? "series" : type === "animes" ? "animes" : "peliculas"}/${x.slug}/`,
+    title: x.title,
+    overview: x.overview || "",
+    kind: kindOf(type),
+    type: kindOf(type),
+    poster: galleryImage(x, "w500") || abs(x.images?.poster),
+    art: galleryImage(x, "original") || abs(x.images?.backdrop || x.images?.poster),
+    backdrop: galleryImage(x, "original") || abs(x.images?.backdrop),
+    year: x.year || Number((x.title || "").match(/\((\d{4})\)/)?.[1])
+  };
 }
 async function sliders(type) {
   return (await get(`/sliders?type=${type}`)).map((x) => card(x, type));
 }
 async function listing(type = "movies", page = 1) {
   const d = await get(`/listing?post_type=${type}&page=${page}&genres=&years=&order=latest`);
-  return { items: (d.posts || []).map((x) => card(x, type)), next: d.next_page ? String(page + 1) : void 0 };
+  return {
+    items: (d.posts || []).map((x) => card(x, type)),
+    next: d.next_page ? String(page + 1) : void 0
+  };
 }
 async function searchMega(q, type = "movies") {
   const d = await get(`/search?post_type=${type}&query=${encodeURIComponent(q)}`);
@@ -984,15 +1002,6 @@ async function players(id) {
 async function episodeList(id) {
   return get(`/episodes?post_id=${encodeURIComponent(id)}`);
 }
-async function resolveEmbed(url) {
-  const r = await kino.fetch(url, { headers: { "User-Agent": HEADERS["User-Agent"], "Referer": BASE_URL + "/" } });
-  const html = await r.text();
-  const source = unpackPacker(html);
-  const m = source.match(/https?:[^"'\\\s]+\.m3u8[^"'\\\s]*/i) || source.match(/["'](\/[^"']+\.m3u8[^"']*)/i);
-  if (!m) throw Error("El embed no expuso un manifiesto HLS");
-  const stream = (m[1] || m[0]).replace(/\\u0026/g, "&");
-  return { url: stream.startsWith("/") ? new URL(stream, url).href : stream, mime: "application/x-mpegURL", headers: { Referer: url, "User-Agent": HEADERS["User-Agent"] } };
-}
 function unescapeJs(s) {
   return s.replace(/\\x([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\'/g, "'").replace(/\\\\/g, "\\");
 }
@@ -1001,7 +1010,7 @@ function token(n, radix) {
   let s = "";
   do {
     s = chars[n % radix] + s;
-    n = Math.floor(n / radix);
+    n = Math.floor(n % radix);
   } while (n);
   return s;
 }
@@ -1016,15 +1025,142 @@ function unpackPacker(html) {
   }
   return out;
 }
+async function resolveEmbed(url) {
+  const r = await kino.fetch(url, {
+    headers: {
+      "User-Agent": HEADERS["User-Agent"],
+      "Referer": BASE_URL + "/"
+    }
+  });
+  if (!r.ok) throw Error(`HTTP ${r.status}`);
+  const html = await r.text();
+  const source = unpackPacker(html);
+  const m = source.match(/https?:[^"'\\\s]+\.m3u8[^"'\\\s]*/i) || source.match(/["'](\/[^"']+\.m3u8[^"']*)/i);
+  if (!m) throw Error("El embed no expuso un manifiesto HLS");
+  const stream = (m[1] || m[0]).replace(/\\u0026/g, "&");
+  return {
+    url: stream.startsWith("/") ? new URL(stream, url).href : stream,
+    mime: "application/x-mpegURL",
+    headers: {
+      Referer: url,
+      "User-Agent": HEADERS["User-Agent"]
+    }
+  };
+}
+
+// src/fallback.js
+var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+function cleanTitle(raw) {
+  return String(raw || "").replace(/\s*\(\d{4}\).*$/, "").replace(/[:–—|].*$/, "").trim();
+}
+function decodeBase64(str) {
+  if (typeof atob === "function") {
+    return atob(str);
+  }
+  return "";
+}
+function decodeNupload(html) {
+  try {
+    const mFunc = html.match(/var\s+([A-Za-z0-9_]+)\s*=\s*"";\s*([A-Za-z0-9_]+)\.forEach\(function\s+[A-Za-z0-9_]+\(value\)\s*\{\s*\1\s*\+=\s*String\.fromCharCode\(parseInt\(atob\(value\)\.replace\(\/\\D\/g,''?\)\)\s*-\s*(\d+)\);\s*\}\s*\);/);
+    if (!mFunc) return null;
+    const [_, targetVar, arrVar, offsetStr] = mFunc;
+    const offset = parseInt(offsetStr, 10);
+    const mArr = html.match(new RegExp("var\\s+" + arrVar + "\\s*=\\s*(\\[[^\\]]+\\]);"));
+    if (!mArr) return null;
+    const arr = JSON.parse(mArr[1]);
+    let baseUrl = "";
+    for (const item of arr) {
+      const raw = decodeBase64(item);
+      const code = parseInt(raw.replace(/\D/g, ""), 10) - offset;
+      baseUrl += String.fromCharCode(code);
+    }
+    const mSesz = html.match(/var sesz="([^"]+)"/);
+    const sesz = mSesz ? mSesz[1] : "";
+    return baseUrl + "?s=" + sesz;
+  } catch (_) {
+    return null;
+  }
+}
+async function resolveFallback(title) {
+  const q = cleanTitle(title);
+  if (!q) return null;
+  try {
+    const searchUrl = "https://repelisplus.my/buscar/" + encodeURIComponent(q);
+    const sRes = await kino.fetch(searchUrl, {
+      headers: { "User-Agent": USER_AGENT }
+    });
+    if (!sRes.ok) return null;
+    const sHtml = await sRes.text();
+    const mPost = sHtml.match(/<a[^>]+href=["'](https:\/\/repelisplus\.my\/ver\/[^"']+)["']/i);
+    if (!mPost) return null;
+    const movieUrl = mPost[1];
+    const mRes = await kino.fetch(movieUrl, {
+      headers: { "User-Agent": USER_AGENT }
+    });
+    if (!mRes.ok) return null;
+    const mHtml = await mRes.text();
+    const mJaljz = mHtml.match(/var jaljz = (\{[\s\S]*?\});/);
+    if (!mJaljz) return null;
+    const jaljz = JSON.parse(mJaljz[1]);
+    const keys = [];
+    for (const groupKey of ["0", "1", "2"]) {
+      const group = jaljz[groupKey];
+      if (!group || !group.pos) continue;
+      for (const posKey of Object.keys(group.pos)) {
+        const item = group.pos[posKey];
+        if (item && item.key) {
+          keys.push({ key: item.key, lang: group.id || "Latino" });
+        }
+      }
+    }
+    for (const k of keys.slice(0, 3)) {
+      try {
+        const buUrl = "https://watchfun.top/bu/?key=" + encodeURIComponent(k.key);
+        const buRes = await kino.fetch(buUrl, {
+          headers: { "User-Agent": USER_AGENT, Referer: movieUrl }
+        });
+        if (!buRes.ok) continue;
+        const buHtml = await buRes.text();
+        const iframeSrc = (buHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i) || [])[1];
+        if (!iframeSrc) continue;
+        const nuRes = await kino.fetch(iframeSrc, {
+          headers: { "User-Agent": USER_AGENT, Referer: "https://watchfun.top/" }
+        });
+        if (!nuRes.ok) continue;
+        const nuHtml = await nuRes.text();
+        const m3u8Url = decodeNupload(nuHtml);
+        if (!m3u8Url || !m3u8Url.startsWith("http")) continue;
+        return {
+          url: m3u8Url,
+          mime: "application/x-mpegURL",
+          headers: {
+            Referer: iframeSrc,
+            Origin: new URL(iframeSrc).origin,
+            "User-Agent": USER_AGENT
+          },
+          name: `${k.lang} \xB7 HD (Fallback)`
+        };
+      } catch (_) {
+      }
+    }
+  } catch (err) {
+    console.log("[Mega1080 Fallback] error:", err.message);
+  }
+  return null;
+}
 
 // src/plugin.js
-var VERSION = "1.0.1";
+var VERSION = "1.0.2";
 var P = `[Mega1080 v${VERSION}]`;
 console.log(`${P} Creado por JuandreXter`);
 var log = (x) => console.log(P, x);
 var b;
 function app() {
-  return b || (b = makeBrowse({ kino: typeof kino !== "undefined" ? kino : null, loadTab, searchTitles: async (q) => (await search({ q })).items }));
+  return b || (b = makeBrowse({
+    kino: typeof kino !== "undefined" ? kino : null,
+    loadTab,
+    searchTitles: async (q) => (await search({ q })).items
+  }));
 }
 async function loadTab(t) {
   log(`loadTab("${t}")`);
@@ -1035,7 +1171,11 @@ async function loadTab(t) {
 async function home() {
   log("home(): cargando rieles");
   const [m, s, a] = await Promise.all([sliders("movies"), sliders("tvshows"), sliders("animes")]);
-  return [{ id: "movies", title: "Pel\xEDculas destacadas", ref: "peliculas", items: m }, { id: "series", title: "Series destacadas", ref: "series", items: s }, { id: "anime", title: "Anime destacado", ref: "animes", items: a }].filter((x) => x.items.length);
+  return [
+    { id: "movies", title: "Pel\xEDculas destacadas", ref: "peliculas", items: m },
+    { id: "series", title: "Series destacadas", ref: "series", items: s },
+    { id: "anime", title: "Anime destacado", ref: "animes", items: a }
+  ].filter((x) => x.items.length);
 }
 async function browse(ref = "peliculas", cursor = "1") {
   const type = ref === "series" ? "tvshows" : ref === "animes" ? "animes" : "movies";
@@ -1063,25 +1203,55 @@ async function details(ref) {
 async function episodes(ref) {
   const d = await details(ref);
   const eps = await episodeList(d.sourceId);
-  return { series: { title: d.title, ref }, episodes: eps.map((e) => ({ id: String(e._id), ref: `${ref}#episode=${e._id}`, title: e.title, season: e.season_number, episode: e.episode_number, overview: e.overview || "", kind: "episode", type: "episode", poster: e.still_path ? `https://image.tmdb.org/t/p/w500${e.still_path}` : d.poster })) };
+  return {
+    series: { title: d.title, ref },
+    episodes: eps.map((e) => ({
+      id: String(e._id),
+      ref: `${ref}#episode=${e._id}`,
+      title: e.title,
+      season: e.season_number,
+      episode: e.episode_number,
+      overview: e.overview || "",
+      kind: "episode",
+      type: "episode",
+      poster: e.still_path ? `https://image.tmdb.org/t/p/w500${e.still_path}` : d.poster
+    }))
+  };
 }
 async function resolve(ref) {
   log(`resolve(${ref})`);
   const hash = ref.match(/#episode=(\d+)/);
   let id;
-  if (hash) id = hash[1];
-  else id = (await detail(ref)).sourceId;
-  const list = await players(id);
+  let itemTitle = "";
+  if (hash) {
+    id = hash[1];
+  } else {
+    const d = await detail(ref);
+    id = d.sourceId;
+    itemTitle = d.title;
+  }
+  const list = await players(id).catch(() => []);
   const streams = [];
   for (const x of list) {
     try {
       const s = await resolveEmbed(x.url);
       streams.push({ ...s, name: `${x.lang || "Servidor"} \xB7 ${x.quality || "HD"}` });
+      break;
     } catch (e) {
-      log(`servidor omitido: ${e.message}`);
+      log(`servidor primario omitido: ${e.message}`);
     }
   }
-  if (!streams.length) throw Error("No se pudo resolver ning\xFAn servidor HLS");
+  if (!streams.length && itemTitle) {
+    log(`buscando fallback para "${itemTitle}"...`);
+    const fb = await resolveFallback(itemTitle);
+    if (fb) {
+      log(`fallback exitoso: ${fb.url}`);
+      streams.push(fb);
+    }
+  }
+  if (!streams.length) {
+    throw Error("No se pudo resolver ning\xFAn servidor HLS");
+  }
   return { ...streams[0], alternatives: streams.slice(1) };
 }
 async function screen(ctx) {
