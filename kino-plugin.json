@@ -1,0 +1,53 @@
+{
+  "id": "mega1080",
+  "name": "Mega1080",
+  "version": "1.0.0",
+  "apiVersion": 13,
+  "entry": "plugin.js",
+  "icon": "icon.png",
+  "hosts": [
+    "mega1080.me"
+  ],
+  "streamHosts": "any",
+  "capabilities": [
+    "search",
+    "home",
+    "browse",
+    "episodes",
+    "resolve"
+  ],
+  "settings": [],
+  "theme": {
+    "accent": "#8C52FF",
+    "onAccent": "#0D0114",
+    "background": "#0D0114",
+    "surface": "#1B1028",
+    "highlight": "#C49BFF"
+  },
+  "description": "Mega1080 para Kino: películas, series y anime.",
+  "homepage": "https://mega1080.me/",
+  "repo": "JuanDEVYT/Mega1080_plugin",
+  "consent": "Puede reproducir video desde cualquier servidor que indique",
+  "enhancements": {
+    "14": {
+      "capabilities": [
+        "screen"
+      ],
+      "screen": {
+        "label": "Mega1080",
+        "labelEn": "Mega1080",
+        "icon": "movie",
+        "menuOpens": "screen",
+        "opensFrom": [
+          "menu",
+          "settings"
+        ],
+        "settingsButton": {
+          "label": "Abrir Mega1080",
+          "labelEn": "Open Mega1080"
+        },
+        "settingsIn": "screen"
+      }
+    }
+  }
+}

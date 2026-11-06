@@ -1,0 +1,1 @@
+{"name":"kino-plugin-devoracine","version":"1.0.0","type":"module","scripts":{"build":"esbuild src/plugin.js --bundle --format=esm --outfile=plugin.js","test":"node --test test/*.test.mjs"},"devDependencies":{"esbuild":"^0.25.0"}}

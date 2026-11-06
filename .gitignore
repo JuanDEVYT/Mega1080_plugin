@@ -1,0 +1,9 @@
+node_modules/
+.kino-cookies.json
+.kino-storage.json
+.kino-notices.json
+dist/
+*.log
+.DS_Store
+entregables/
+sdk/
